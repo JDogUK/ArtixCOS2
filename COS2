@@ -282,6 +282,37 @@ function FindNextCase(roll)
 			nextCase = "Free Case"
 		end
 	end
+	if GetCaseMoney().Value > 69.30 then
+		nextCase = "Free Case"
+	end
+	if GetCaseMoney().Value > 233.63 then
+		nextCase = "Free Case"
+	end
+	--[[
+	if not big and not farm_smalls then
+		if GetCaseMoney().Value > 116.57 then
+			nextCase = "Free Case"
+		end
+		if GetCaseMoney().Value > 233.63 then
+			nextCase = "Free Case"
+		end
+		if GetCaseMoney().Value > 332.72 then
+			nextCase = "Free Case"
+		end
+	end
+	if farm_smalls then
+		if GetCaseMoney().Value > 69.30 then
+			nextCase = "Free Case"
+		end
+	end
+	if big then
+		if GetCaseMoney().Value > 89.97 then
+			nextCase = "Free Case"
+		end
+		if GetCaseMoney().Value > 434.00 then
+			nextCase = "Free Case"
+		end
+	end
 	]]
 	NextCase = nextCase
 	if MainUI then
