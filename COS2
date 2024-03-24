@@ -266,7 +266,7 @@ function FindNextCase(roll)
 	local nextCase = "Free Case"
 	if not roll and GetCaseMoney().Value > 1.25 and (NextCase == "Free Case" or
 	NextCase == "Free Case" or NextCase == "Free Case" or NextCase == "Free Case" or
-	NextCase == "Free Case") then
+	NextCase == "50 50 Case") then
 		return
 	end
 	local val = math.random()
