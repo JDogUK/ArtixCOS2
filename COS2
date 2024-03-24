@@ -1,3 +1,15 @@
+--[[
+	Case Opening Simulator 2 Script: Made by Windowman8838
+	DO NOT SELL OR REDISTRIBUTE THIS SCRIPT WITHOUT MY PERMISSION!!!
+ 
+	Notes:
+		- SimpleSpy must be initialized in order for the AFK bypass to work
+ 
+		- In an attempt to bypass logs, you can enable TeleportMechanics to hop between servers
+		every 20-23 minutes. In order for this to work, you must have the autoexec version of
+		this script, with SimpleSpy, and an Anti-AFK script both in autoexec as well.
+--]]
+ 
 if _G.AutoOpenerInit then return end
 if game.PlaceId ~= 10514822281 then return end
  
@@ -261,57 +273,7 @@ function CaseOpenLoop()
 	end
 	CaseOpenLoop()
 end
- 
-function FindNextCase(roll)
-	local nextCase = "Free Case"
-	if not roll and GetCaseMoney().Value > 1.25 and (NextCase == "Free Case" or
-	NextCase == "Free Case" or NextCase == "Free Case" or NextCase == "Free Case" or
-	NextCase == "50 50 Case") then
-		return
-	end
-	local val = math.random()
-	if roll and GetCaseMoney().Value > 1.25 and val <= 0.11 then
-		nextCase = "Free Case"
-		if math.random() <= 0.15 then
-			nextCase = "Free Case"
-		elseif math.random() <= 0.15 then
-			nextCase = "Free Case"
-		elseif math.random() <= 0.15 then
-			nextCase = "Free Case"
-		elseif math.random() <= 0.15 then
-			nextCase = "Free Case"
-		end
-	end
-	if GetCaseMoney().Value > 69.30 then
-		nextCase = "Free Case"
-	end
-	if GetCaseMoney().Value > 233.63 then
-		nextCase = "Free Case"
-	end
-	--[[
-	if not big and not farm_smalls then
-		if GetCaseMoney().Value > 116.57 then
-			nextCase = "Free Case"
-		end
-		if GetCaseMoney().Value > 233.63 then
-			nextCase = "Free Case"
-		end
-		if GetCaseMoney().Value > 332.72 then
-			nextCase = "Free Case"
-		end
-	end
-	if farm_smalls then
-		if GetCaseMoney().Value > 69.30 then
-			nextCase = "Free Case"
-		end
-	end
-	if big then
-		if GetCaseMoney().Value > 89.97 then
-			nextCase = "Free Case"
-		end
-		if GetCaseMoney().Value > 434.00 then
-			nextCase = "Free Case"
-		end
+
 	end
 	]]
 	NextCase = nextCase
