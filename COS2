@@ -1,0 +1,614 @@
+if _G.AutoOpenerInit then return end
+if game.PlaceId ~= 10514822281 then return end
+ 
+local AUTORUNBYPASS = true
+ 
+local InitTime = tick()
+local TimeToWait = math.random(2000, 2500)
+local TeleportMechanicsEnabled = true
+ 
+local CHECK_MARK_ASSET = "rbxassetid://11211029177"
+local VALUE_THRESHOLD = 5000.00
+local BIG_WIN_THRESHOLD = 1000.00
+local big = false
+local farm_smalls = true
+ 
+if big then
+	VALUE_THRESHOLD = 7000.00
+end
+if farm_smalls then
+	VALUE_THRESHOLD = 2090.00
+end
+ 
+local PromptOverlayConnection = nil
+ 
+while not game:IsLoaded() do wait() end
+ 
+Player = game.Players.LocalPlayer
+if game:GetService("TeleportService"):GetLocalPlayerTeleportData() ~= 2000 and not AUTORUNBYPASS then return end
+ 
+local RAMAccount, WebserverSettings = loadstring(game:HttpGet'https://raw.githubusercontent.com/ic3w0lf22/Roblox-Account-Manager/master/RAMAccount.lua')()
+local MyAccount = RAMAccount.new(game:GetService'Players'.LocalPlayer.Name, true)
+WebserverSettings:SetPort(3333)
+ 
+Player:WaitForChild("NCC")
+wait(5)
+ 
+ReplicatedStorage = game:GetService("ReplicatedStorage")
+TweenService = game:GetService("TweenService")
+TeleportService = game:GetService("TeleportService")
+RunService = game:GetService("RunService")
+HttpService = game:GetService("HttpService")
+COS2Index = nil
+CrateInfo = ReplicatedStorage.Crates.Normals
+ 
+local LogPath = "casedata_" .. Player.Name .. ".json"
+ 
+CrateOpenSignal = nil
+InventoryItemAddedSignal = nil
+InventoryItemRemovedSignal = nil
+InventoryValueUpdateSignal = nil
+InventoryTextUpdateSignal = nil
+ 
+CrateOpenEvent = ReplicatedStorage.Events.NormalCrateOpen
+-- The first RemoteFunction will always be SellItem
+SellItemEvent = ReplicatedStorage.Events:FindFirstChildOfClass("RemoteFunction")
+CBKEvent = ReplicatedStorage.Events.Misc.CBK
+SC1Event = ReplicatedStorage.Events.Misc.SC1
+SC2Event = ReplicatedStorage.Events.Misc.SC2
+SendResultEvent = ReplicatedStorage.Events.SendResult
+SellDoublesEvent = ReplicatedStorage.Events.SellDoubles
+ 
+NextCase = nil
+ 
+local MainUI = nil
+local InventoryList = game.Players.LocalPlayer:FindFirstChild("InventoryList", true)
+local ScreenGUI = InventoryList.Parent.Parent.Parent
+local InspectTip = ScreenGUI:FindFirstChild("InspectTip", true)
+local CaseButtons = nil
+ 
+local case_data = {
+	player = Player.Name,
+	cases_opened = 0,
+	best_hit = { 
+		case = "",
+		item = "",
+		value = 0,
+	},
+	cases = {}
+}
+ 
+function Initialize(ui_only)
+	if TeleportMechanicsEnabled then
+		warn("Case Opening Simulator 2 Farmer initializing (Time to wait: " .. TimeToWait .. " seconds)")
+	else
+		warn("Case Opening Simulator 2 Farmer initializing")
+	end
+ 
+	if game.CoreGui:FindFirstChild("MainUI") then
+		game.CoreGui.MainUI:Destroy()
+	end
+	MainUI = CreateUI()
+	MainUI.Parent = game.CoreGui
+ 
+	if ui_only then return end
+ 
+	_G.AutoOpenerInit = true
+	_G.Shutdown = Shutdown
+ 
+	for _, v in pairs(getreg()) do
+		if type(v) ~= "function" or not islclosure(v) then continue end
+		for _, const in pairs(getconstants(v)) do
+			if const ~= "InventoryTemplate" then continue end
+			print(const)
+			for i, upvalue in pairs(getupvalues(v)) do
+				if type(upvalue) ~= "table" then continue end
+				print(upvalue["BOX"])
+				if upvalue["Darkheart"] then _G.COS2Index = upvalue end
+			end
+		end
+	end
+ 
+	COS2Index = _G.COS2Index
+ 
+	InventoryTextUpdateSignal = MainUI.LastInventoryValue.Changed:Connect(function()
+		MainUI.Frame.TotalValue.Text = "Total Inventory Value: $" .. string.format("%.2f", MainUI.LastInventoryValue.Value)
+	end)
+	InventoryValueUpdateSignal = MainUI.InventoryValue.Changed:Connect(function()
+		TweenService:Create(MainUI.LastInventoryValue, TweenInfo.new(1), { Value = MainUI.InventoryValue.Value }):Play()
+	end)
+	InventoryItemAddedSignal = InventoryList.ChildAdded:Connect(function(obj)
+		MainUI:FindFirstChild("InventoryValue").Value = GetInventoryValue()
+	end)
+	InventoryItemRemovedSignal = InventoryList.ChildRemoved:Connect(function(obj)
+		MainUI:FindFirstChild("InventoryValue").Value = GetInventoryValue()
+	end)
+	MainUI:FindFirstChild("InventoryValue").Value = GetInventoryValue()
+ 
+	local GradientUpdater
+	GradientUpdater = RunService.RenderStepped:Connect(function(deltaTime)
+		if not _G.AutoOpenerInit then 
+			GradientUpdater:Disconnect()
+			return
+		end
+		if not MainUI.Frame.NextCase:FindFirstChild("UIGradient") then
+			return
+		end
+		local uiGradient = MainUI.Frame.NextCase.UIGradient
+ 
+		local ROTATE_SPEED = 90
+		local currentRotation = uiGradient.Rotation
+		uiGradient.Rotation = (currentRotation + ROTATE_SPEED * deltaTime) % 360
+	end)
+ 
+	for _, v in pairs(getreg()) do
+		if type(v) ~= "function" or not islclosure(v) then continue end
+		for _, const in pairs(getconstants(v)) do
+			if const ~= "NormalCrateOpen" then continue end
+			for i, upValue in getupvalues(v) do
+				if type(upValue) == "number" then
+					_G.CrateOpenFunction = v
+					_G.MagicNumberIndex = i
+				end
+			end
+		end
+		local funcinfo = getinfo(v)
+		if string.find(funcinfo.source, "UI_FrameWork") and funcinfo.numparams == 2 and funcinfo.nups == 1 then
+			_G.RecentCrateOpenings = getupvalues(v)[1]
+		end
+	end
+ 
+	for _, v in pairs(InspectTip.Parent:GetChildren()) do
+		if string.find(v.Name, "{") then CaseButtons = v break end
+	end
+ 
+	if isfile(LogPath) then
+		case_data = HttpService:JSONDecode(readfile(LogPath))
+	else
+		writefile(LogPath, HttpService:JSONEncode(case_data))
+	end
+end
+ 
+function CaseOpenLoop()
+	if not _G.AutoOpenerInit then return end
+ 
+	MainUI:FindFirstChild("InventoryValue").Value = GetInventoryValue()
+	coroutine.resume(coroutine.create(CheckSecurityAFK))
+	--coroutine.resume(coroutine.create(AutoRejoin))
+ 
+	local invValue = GetInventoryValue()
+	local freeCaseValue = GetInventoryValue(true)
+	if invValue + GetCaseMoney().Value > VALUE_THRESHOLD then
+		warn("Shutdown due to exceeding $" .. string.format("%.2f", VALUE_THRESHOLD))
+		_G.Shutdown()
+		MyAccount:SetDescription("[NEW] Account hit at $" .. string.format("%.2f", GetInventoryValue()) .. " + $" .. string.format("%.2f", GetCaseMoney().Value))
+		PostAccountHit()
+		Player:Kick("You've exceeded the threshold of $" .. string.format("%.2f", VALUE_THRESHOLD) .. "; You now have $" .. string.format("%.2f", GetInventoryValue() + GetCaseMoney().Value))
+		return
+	end
+	if TeleportMechanicsEnabled and tick() - InitTime > TimeToWait then
+		local TP = coroutine.create(ChangeServer)
+ 		coroutine.resume(TP)
+	end
+ 
+	if invValue > 75.00 then
+		SellDoublesEvent:InvokeServer()
+		for _, v in GetSortedInventory() do
+			SellItemEvent:InvokeServer(v.Name, game.PlaceVersion)
+		end
+	end
+ 
+	FindNextCase()
+ 
+	if not _G.RecentCrateOpenings then
+		local TP = coroutine.create(ChangeServer)
+ 		coroutine.resume(TP)
+		return
+	end
+ 
+ 
+	CrateOpenEvent:FireServer(NextCase, getupvalue(_G.CrateOpenFunction, _G.MagicNumberIndex))
+ 
+	local CrateOpenConnection
+	CrateOpenConnection = CrateOpenEvent.OnClientEvent:Connect(function(item, case)
+		CrateOpenConnection:Disconnect()
+		local magicNumber = getupvalue(_G.CrateOpenFunction, _G.MagicNumberIndex)
+		magicNumber *= game.PlaceVersion
+		magicNumber /= 3
+		print(magicNumber)
+		setupvalue(_G.CrateOpenFunction, _G.MagicNumberIndex, magicNumber)
+ 
+		if COS2Index[item].Price < VALUE_THRESHOLD then
+			SellItemEvent:InvokeServer(item, game.PlaceVersion)
+		end
+ 
+		for _, v in pairs(CaseButtons:GetChildren()) do
+			if v:IsA("TextButton") then v.Active = false end
+		end
+ 
+		local success, response = pcall(LogCaseOpening, case, item)
+		if not success then
+			warn("Error while logging case opening:\n" .. tostring(response))
+		end
+ 
+		task.wait(6)
+ 
+		for _, v in pairs(CaseButtons:GetChildren()) do
+			if v:IsA("TextButton") then v.Active = true end
+		end
+ 
+		if COS2Index[item].Price >= BIG_WIN_THRESHOLD then
+			--BigWinManager:PostBigWin(case, item)
+		end
+	end)
+ 
+	local startTime = tick()
+	local currentTime = tick()
+	local countdownTime = 6.3
+ 
+	FindNextCase(true)
+	while _G.AutoOpenerInit and currentTime - startTime <= countdownTime do	
+		FindNextCase()
+ 
+		currentTime = tick()
+		local remainingTime = countdownTime - (currentTime - startTime)
+		local text = "0.00 seconds"
+		if remainingTime > 0 then text = string.format("%.2f", remainingTime) .. " seconds" end
+ 
+		MainUI.Frame.NextRoll.Text = "Next roll in: " .. text
+ 
+		task.wait()
+	end
+	CaseOpenLoop()
+end
+ 
+function FindNextCase(roll)
+	local nextCase = "Free Case"
+	if not roll and GetCaseMoney().Value > 1.25 and (NextCase == "Free Case" or
+	NextCase == "Free Case" or NextCase == "Free Case" or NextCase == "Free Case" or
+	NextCase == "Free Case") then
+		return
+	end
+	local val = math.random()
+	if roll and GetCaseMoney().Value > 1.25 and val <= 0.11 then
+		nextCase = "Free Case"
+		if math.random() <= 0.15 then
+			nextCase = "Free Case"
+		elseif math.random() <= 0.15 then
+			nextCase = "Free Case"
+		elseif math.random() <= 0.15 then
+			nextCase = "Free Case"
+		elseif math.random() <= 0.15 then
+			nextCase = "Free Case"
+		end
+	end
+	]]
+	NextCase = nextCase
+	if MainUI then
+		MainUI.Frame.NextCase.Text = "Next Case: " .. NextCase
+		if MainUI.Frame.NextCase:FindFirstChild("UIGradient") then
+			MainUI.Frame.NextCase.UIGradient:Destroy()
+		end
+		if NextCase ~= "Free Case" then
+			MainUI.Frame.NextCase.Text = "Next Case: " .. NextCase .. " ($" .. string.format("%.2f", CrateInfo[NextCase].Price.Value) .. ")" 
+		end
+		local midValue = math.floor((#CrateInfo[NextCase]:GetChildren() - 2) / 2)
+		local current = 1
+		for _, v in pairs(CrateInfo[NextCase]:GetChildren()) do
+			if not v:FindFirstChild("Color") then continue end
+			current += 1
+			if midValue ~= current - 1 then continue end
+ 
+			MainUI.Frame.NextCase.TextColor3 = Color3.new(255, 255, 255)
+			local gradient = Instance.new("UIGradient", MainUI.Frame.NextCase)
+			gradient.Name = "UIGradient"
+			gradient.Rotation = 90
+			gradient.Color = v.Color.Color
+ 
+			break
+		end
+ 
+		MainUI.Frame.CaseImage.Image = CrateInfo[NextCase].CrateImage.Value
+	end
+end
+ 
+function CreateUI()
+	local MainScreen = Instance.new("ScreenGui")
+	MainScreen.Name = "MainUI"
+	MainScreen.Enabled = true
+ 
+	local MainFrame = Instance.new("Frame")
+	MainFrame.Active = true
+	MainFrame.Draggable = true
+	MainFrame.Parent = MainScreen
+	MainFrame.Visible = true
+	MainFrame.BackgroundColor3 = Color3.fromRGB(29, 31, 50)
+	MainFrame.Position = UDim2.new(0.4, 0, 0.35, 0)
+	MainFrame.Size = UDim2.new(0.20, 0, 0.30, 0)
+ 
+	for _, v in pairs(game:GetDescendants()) do
+		if (v and v.Name == "VIPStroke") then
+			v:Clone().Parent = MainFrame
+			MainFrame.VIPStroke.Enabled = true
+		end
+	end
+ 
+	local Title = Instance.new("TextLabel")
+	Title.Parent = MainFrame
+	Title.Name = "Title"
+	Title.Visible = true
+	Title.BackgroundColor3 = Color3.fromRGB(21, 23, 39)
+	Title.Size = UDim2.new(1, 0, 0.22, 0)
+	Title.Font = Enum.Font.FredokaOne
+	Title.Text = "Case Opening Simulator 2 Script"
+	Title.TextColor3 = Color3.fromRGB(239, 198, 45)
+	Title.TextScaled = true
+ 
+	local NextRollText = Instance.new("TextLabel")
+	NextRollText.Parent = MainFrame
+	NextRollText.Name = "NextRoll"
+	NextRollText.Visible = true
+	NextRollText.BackgroundTransparency = 1
+	NextRollText.Size = UDim2.new(0.95, 0, 0.118, 0)
+	NextRollText.Position = UDim2.new(0.025, 0, 0.73, 0)
+	NextRollText.Font = Enum.Font.FredokaOne
+	NextRollText.Text = "Next roll in: ???"
+	NextRollText.TextColor3 = Color3.fromRGB(255, 193, 109)
+	NextRollText.TextScaled = true
+	NextRollText.TextXAlignment = Enum.TextXAlignment.Center
+ 
+	local TotalValueText = Instance.new("TextLabel")
+	TotalValueText.Parent = MainFrame
+	TotalValueText.Name = "TotalValue"
+	TotalValueText.Visible = true
+	TotalValueText.BackgroundTransparency = 1
+	TotalValueText.Size = UDim2.new(1, 0, 0.118, 0)
+	TotalValueText.Position = UDim2.new(0, 0, .85, 0)
+	TotalValueText.Font = Enum.Font.FredokaOne
+	TotalValueText.Text = "Total Inventory Value: ???"
+	TotalValueText.TextColor3 = Color3.fromRGB(72, 192, 51)
+	TotalValueText.TextScaled = true
+	TotalValueText.TextXAlignment = Enum.TextXAlignment.Center
+ 
+	local NextCase = Instance.new("TextLabel")
+	NextCase.Parent = MainFrame
+	NextCase.Name = "NextCase"
+	NextCase.Visible = true
+	NextCase.BackgroundTransparency = 1
+	NextCase.Size = UDim2.new(0.95, 0, 0.12, 0)
+	NextCase.Position = UDim2.new(0.025, 0, 0.25, 0)
+	NextCase.Font = Enum.Font.FredokaOne
+	NextCase.Text = "Next Case: ???"
+	NextCase.TextColor3 = Color3.fromRGB(255, 79, 64)
+	NextCase.TextScaled = true
+	NextCase.TextXAlignment = Enum.TextXAlignment.Center
+ 
+	local CaseImage = Instance.new("ImageLabel")
+	CaseImage.Parent = MainFrame
+	CaseImage.Name = "CaseImage"
+	CaseImage.Visible = true
+	CaseImage.Size = UDim2.new(0.3, 0, 0.4, 0)
+	CaseImage.Position = UDim2.new(0.35, 0, 0.35, 0)
+	CaseImage.BackgroundTransparency = 1
+	CaseImage.Image = "rbxassetid://11714221186"
+ 
+	local UICorner = Instance.new("UICorner")
+	UICorner.CornerRadius = UDim.new(0, 8)
+	UICorner:Clone().Parent = MainFrame
+	UICorner:Clone().Parent = Title
+ 
+	local invValue = Instance.new("NumberValue")
+	invValue.Name = "InventoryValue"
+	invValue.Parent = MainScreen
+ 
+	local lastInvValue = Instance.new("NumberValue")
+	lastInvValue.Name = "LastInventoryValue"
+	lastInvValue.Parent = MainScreen
+ 
+	return MainScreen
+end
+ 
+function Shutdown()
+	InventoryItemAddedSignal:Disconnect()
+	InventoryItemRemovedSignal:Disconnect()
+	InventoryValueUpdateSignal:Disconnect()
+	InventoryTextUpdateSignal:Disconnect()
+	PromptOverlayConnection:Disconnect()
+	_G.AutoOpenerInit = false
+	if game.CoreGui:FindFirstChild("MainUI") then
+		game.CoreGui.MainUI:Destroy()
+	end
+	for _, v in pairs(CaseButtons:GetChildren()) do
+		if v:IsA("TextButton") then v.Active = true end
+	end
+end
+ 
+function GetInventoryValue(freeCase)
+	local total = 0
+	for _, v in pairs(InventoryList:GetChildren()) do
+		if v and v:IsA("Frame") and COS2Index[v.Name] then
+			if freeCase then
+				if CrateInfo["Free Case"]:FindFirstChild(v.Name) then
+					total = total + COS2Index[v.Name].Price
+				end
+				continue
+			end
+			total = total + COS2Index[v.Name].Price
+		end
+	end
+	return total
+end
+ 
+function GetSortedInventory()
+	local Inventory = Player.Hats:GetChildren()
+	table.sort(Inventory, function(a, b)
+		if COS2Index[a.Name].Price > COS2Index[b.Name].Price then
+			return true
+		end
+		return false
+	end)
+	return pairs(Inventory)
+end
+ 
+function ChangeServer(hide)
+	--if not TeleportMechanicsEnabled then return end
+	local Success, ErrorMessage = pcall(function()
+		local serverdata = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. game.PlaceId .. '/servers/Public?sortOrder=Asc&limit=100'))
+		if not hide then
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, serverdata.data[math.random(1, #serverdata.data)].id, LocalPlayer, "", 2000)
+			return
+		end
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, serverdata.data[math.random(1, #serverdata.data)].id, LocalPlayer, "")
+	end)
+ 
+	if ErrorMessage and not Success then
+		warn(ErrorMessage)
+    end
+end
+ 
+local CheckedButtons = {}
+ 
+function CheckSecurityAFK()
+	while _G.AutoOpenerInit do
+		for _, v in pairs(ScreenGUI:GetChildren()) do
+			if v:IsA("Frame") and CheckAFKFrameValidity(v) then
+				for _, v2 in pairs(v:GetChildren()) do
+					if v2:IsA("ImageButton") and v2.Visible and v2.Image == CHECK_MARK_ASSET then
+						local cap = _G.CurrentFPSCap
+						--setfpscap(20)
+						for _, v3 in pairs(getconnections(v2.Activated)) do
+							v3:Function()
+						end
+						--setfpscap(cap)
+						break
+					end
+				end
+			end
+		end
+		wait(1)
+	end
+end
+ 
+function CheckAFKFrameValidity(Frame)
+	return Frame.Visible and Frame.Size.X.Scale > 0 and Frame.Size.Y.Scale > 0
+end
+ 
+function LogCaseOpening(Case, Item)
+	local itemInfo = COS2Index[Item]
+ 
+	--[[
+	local case_data = {
+	player = Player.Name,
+	cases_opened = 0,
+	best_hit = { 
+		case: "",
+		item: "",
+		value: 0,
+	}
+	cases = {}
+}
+ 
+	--]]
+ 
+	case_data["cases_opened"] += 1
+	if itemInfo.Price > case_data["best_hit"].value then
+		case_data["best_hit"] = {
+			case = Case,
+			item = Item,
+			value = itemInfo.Price
+		}
+	end
+ 
+	if not case_data["cases"][Case] then case_data["cases"][Case] = {} end
+ 
+	local caseInfo = case_data["cases"][Case]
+ 
+	caseInfo["opened"] = (caseInfo["opened"] or 0) + 1
+	if caseInfo["best_hit"] and itemInfo.Price > caseInfo["best_hit"].value then
+		caseInfo["best_hit"] = {
+			item = Item,
+			value = itemInfo.Price
+		}
+	end
+ 
+	if not caseInfo["items"] then caseInfo["items"] = {} end
+	if not caseInfo["items"][Item] then caseInfo["items"][Item] = {} end
+ 
+	local caseItemInfo = caseInfo["items"][Item]
+	caseItemInfo["opened"] = (caseItemInfo["opened"] or 0) + 1
+	caseItemInfo["value"] = itemInfo.Price
+ 
+	--print(Encode(case_data))
+ 
+	writefile(LogPath, Encode(case_data))
+end
+ 
+function Encode(json)
+    local function EncodeInner(obj, indent)
+        local json_str = ""
+        if type(obj) == "table" then
+            json_str = json_str .. "{\n"
+            local keys = {}
+            for k, v in pairs(obj) do
+                table.insert(keys, k)
+            end
+            table.sort(keys)
+            for i, k in ipairs(keys) do
+                local v = obj[k]
+                json_str = json_str .. string.rep(" ", indent + 4) .. '"' .. k .. '": ' .. EncodeInner(v, indent + 4)
+                if i < #keys then
+                    json_str = json_str .. ","
+                end
+                json_str = json_str .. "\n"
+            end
+            json_str = json_str .. string.rep(" ", indent) .. "}"
+        elseif type(obj) == "string" then
+            json_str = json_str .. '"' .. obj .. '"'
+        else
+            json_str = json_str .. tostring(obj)
+        end
+        return json_str
+    end
+ 
+    return EncodeInner(json, 0)
+end
+ 
+function PostAccountHit()
+	local url = "https://discord.com/api/webhooks/1165855462000967771/3xD1Yq8M0izLF2C1c9S73pJxV9Y1ZTKRNlNL5yoVB2HsGOeuoNuTB01oATqDxLLWpNho"
+	local body = {
+  		content = "Account " .. Player.Name .. " hit with $" .. string.format("%.2f", GetInventoryValue() + GetCaseMoney().Value),
+  		tts = false,
+	}
+	body = HttpService:JSONEncode(body)
+	local response = request({
+    	Url = url,
+    	Method = "POST",
+    	Headers = {
+			["Content-Type"] = "application/json"
+    	},  
+    	Body = body,
+	})
+ 
+	return response
+end
+ 
+function GetCaseMoney()
+	for _, v in pairs(Player:GetChildren()) do
+		if v.ClassName == "NumberValue" and string.find(v.Name, "{") then return v end
+	end
+end
+ 
+PromptOverlayConnection = game:GetService("CoreGui").RobloxPromptGui.promptOverlay.ChildAdded:Connect(function(Kick)
+    if Kick.Name == 'ErrorPrompt' and Kick:FindFirstChild('MessageArea') and Kick.MessageArea:FindFirstChild("ErrorFrame") then
+   		ChangeServer()
+   		PromptOverlayConnection:Disconnect()
+	end
+end)
+ 
+if _G.AutoOpenerInit then
+	_G.Shutdown()
+	return
+end
+ 
+Initialize(false)
+CaseOpenLoop()
