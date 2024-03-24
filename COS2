@@ -273,7 +273,57 @@ function CaseOpenLoop()
 	end
 	CaseOpenLoop()
 end
-
+ 
+function FindNextCase(roll)
+	local nextCase = "Free Case"
+	if not roll and GetCaseMoney().Value > 1.25 and (NextCase == "Stylish Case" or
+	NextCase == "Polished Case" or NextCase == "Featherweight Case" or NextCase == "Contrast Case" or
+	NextCase == "50 50 Case") then
+		return
+	end
+	local val = math.random()
+	if roll and GetCaseMoney().Value > 1.25 and val <= 0.11 then
+		nextCase = "Stylish Case"
+		if math.random() <= 0.15 then
+			nextCase = "Polished Case"
+		elseif math.random() <= 0.15 then
+			nextCase = "Featherweight Case"
+		elseif math.random() <= 0.15 then
+			nextCase = "Contrast Case"
+		elseif math.random() <= 0.15 then
+			nextCase = "50 50 Case"
+		end
+	end
+	if GetCaseMoney().Value > 69.30 then
+		nextCase = "Gas Case"
+	end
+	if GetCaseMoney().Value > 233.63 then
+		nextCase = "Chess Case"
+	end
+	--[[
+	if not big and not farm_smalls then
+		if GetCaseMoney().Value > 116.57 then
+			nextCase = "Skeleton Case"
+		end
+		if GetCaseMoney().Value > 233.63 then
+			nextCase = "Chess Case"
+		end
+		if GetCaseMoney().Value > 332.72 then
+			nextCase = "Problem Case"
+		end
+	end
+	if farm_smalls then
+		if GetCaseMoney().Value > 69.30 then
+			nextCase = "Gas Case"
+		end
+	end
+	if big then
+		if GetCaseMoney().Value > 89.97 then
+			nextCase = "Artefact Case"
+		end
+		if GetCaseMoney().Value > 434.00 then
+			nextCase = "Forest Case"
+		end
 	end
 	]]
 	NextCase = nextCase
